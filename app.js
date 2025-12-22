@@ -482,3 +482,42 @@ document.title = 'Pomodoro · Listo';
 
 // init
 restoreUIFromSession();
+
+
+// === Background image handling (vanilla JS) ===
+const bgButton = document.getElementById("background-button");
+const bgInput = document.getElementById("background-input");
+
+// Abrir selector de archivos
+bgButton.addEventListener("click", () => {
+  bgInput.click();
+});
+
+// Seleccionar imagen
+bgInput.addEventListener("change", (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const bgValue = `url(${reader.result})`;
+    applyBackground(bgValue);
+    localStorage.setItem("customBackground", bgValue);
+  };
+  reader.readAsDataURL(file);
+});
+
+// Aplicar fondo
+function applyBackground(bgValue){
+  document.body.style.backgroundImage = bgValue;
+  document.body.style.backgroundSize = "cover";
+  document.body.style.backgroundPosition = "center";
+  document.body.style.backgroundAttachment = "fixed";
+  document.body.classList.add("has-custom-bg");
+}
+
+// Cargar fondo guardado
+const savedBg = localStorage.getItem("customBackground");
+if (savedBg){
+  applyBackground(savedBg);
+}
