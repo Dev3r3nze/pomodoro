@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Pomodoro · 25:00</title>
+    <link rel="icon" type="image/x-icon" href="icon.ico">
+    <!-- Bootstrap CSS (CDN) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="global.css" />
+
+</head>
+
+<body>
+    <div class="center-wrap">
+        <div class="pom-card d-flex split-row">
+            <!-- LEFT: Tasks -->
+            <div class="left-panel flex-fill" style="min-width:320px; flex:1 1 45%;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                        <h3 class="mb-0">Sesión de estudio</h3>
+                    </div>
+                    <div class="text-end">
+                        <div id="session-state" class="meta-pill">Inactiva</div>
+                    </div>
+                </div>
+
+                <!-- Add task -->
+                <form id="add-task-form" class="row g-2 align-items-center mb-3">
+                    <div class="col">
+                        <input id="task-title" required placeholder="Título de la tarea"
+                            class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-auto">
+                        <input id="task-estimate" type="number" min="1" value="1" class="form-control form-control-sm"
+                            style="width:90px;" />
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg"></i>
+                            Añadir</button>
+                    </div>
+                </form>
+
+                <!-- Tasks list -->
+                <div id="tasks-list" class="list-group mb-3" aria-live="polite">
+                    <!-- elementos añadidos por JS -->
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center tiny">
+                    <div>Tramos totales estimados: <strong id="total-pomos">0</strong></div>
+                    <div>Duración estimada: <strong id="total-duration">0 min</strong></div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Timer -->
+            <div class="right-panel mt-5 flex-fill d-flex flex-column" style="flex:1 1 55%;">
+                <div class="d-flex flex-column align-items-start mb-2">
+                    <div>
+                        <div class="tiny text-center">Sesión</div>
+                        <div class="big-timer" id="display-timer">25:00</div>
+                        <div class="tiny text-muted" id="display-mode">Concentración</div>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center w-100 mt-3 gap-2 ">
+                        <div class="tiny">Completados</div>
+                        <div style="font-size:1.25rem;font-weight:700;" id="completed-count">0</div>
+                        <div class="tiny text-muted">tramos</div>
+                    </div>
+                </div>
+
+                <!-- progress -->
+                <div class="mb-3  w-75">
+                    <div class="d-flex justify-content-between align-items-center flex-column small mb-1">
+                        <div id="progress-label">Progreso tramo</div>
+                        <div id="progress-remaining" class="tiny">25:00</div>
+                    </div>
+                    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                        <div id="progress-bar" class="progress-bar" style="width:0%"></div>
+                    </div>
+                </div>
+
+                <!-- controls -->
+                <div class="mb-3 controls d-flex gap-2">
+                    <button id="start-session" class="btn btn-success d-flex align-items-center"
+                        title="Iniciar sesión"><i class="bi bi-play-fill me-2"></i> Iniciar sesión</button>
+                    <button id="pause-resume" class="btn btn-outline-primary d-flex align-items-center" disabled><i
+                            class="bi bi-pause-fill me-2"></i> Pausar</button>
+                    <button id="end-session" class="btn btn-danger d-flex align-items-center ms-auto" disabled><i
+                            class="bi bi-stop-fill me-2"></i> Terminar sesión</button>
+                </div>
+
+                <!-- small session summary / controls -->
+                <div class="d-flex gap-3 align-items-center tiny mb-3">
+                    <div>Duración total sesión: <strong id="session-total-duration">0m</strong></div>
+                    <div>|</div>
+                    <div>Tramos completados: <strong id="session-completed-display">0</strong></div>
+                    <div>|</div>
+                    <div>Tramo actual: <strong id="current-tramo-index">—</strong></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary modal -->
+    <div class="modal fade" id="summaryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Resumen de la sesión</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Duración total:</strong> <span id="summary-duration"></span></p>
+                    <p><strong>Pomodoros completados:</strong> <span id="summary-pomos"></span></p>
+                    <p><strong>Tareas completadas:</strong></p>
+                    <ul id="summary-tasks" class="list-group list-group-flush small"></ul>
+                </div>
+                <div class="modal-footer">
+                    <button id="close-summary" type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
