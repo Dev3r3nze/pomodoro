@@ -14,6 +14,10 @@ const SHORT_BREAK_SEC = 5 * 60; // 5 minutos
 const LONG_BREAK_SEC = 15 * 60; // 15 minutos
 const LONG_BREAK_EVERY = 4; // cada 4 tramos concentración -> descanso largo
 
+// Sounds
+const intervalEndSound = new Audio("sounds/interval-end.wav");
+intervalEndSound.volume = 0.6;
+
 // Storage keys
 const KEY_TASKS = 'pomodoro.tasks.v1';
 const KEY_SESSION = 'pomodoro.session.v1';
@@ -29,7 +33,7 @@ const pauseResumeBtn = document.getElementById('pause-resume');
 const endBtn = document.getElementById('end-session');
 const completedCountEl = document.getElementById('completed-count');
 const progressBarEl = document.getElementById('progress-bar');
-const progressRemainingEl = document.getElementById('progress-remaining');
+// const progressRemainingEl = document.getElementById('progress-remaining');
 const progressLabelEl = document.getElementById('progress-label');
 const sessionStateEl = document.getElementById('session-state');
 const sessionTotalDurationEl = document.getElementById('session-total-duration');
@@ -217,6 +221,13 @@ function endSession() {
 
 function completeCurrentInterval() {
     if (!session) return;
+
+    // 🔔 Play sound at the end of the interval
+    intervalEndSound.currentTime = 0;
+    intervalEndSound.play().catch(() => {
+        // Ignorar errores si el navegador bloquea autoplay
+    });
+
     const now = Date.now();
     // record
     const rec = { mode: session.mode, at: now, tramoIndex: session.tramoIndex + 1 };
@@ -292,7 +303,7 @@ function tick() {
         displayTimerEl.textContent = secsToMMSS(rem);
         document.title = `Pausado · ${displayTimerEl.textContent}`;
         progressBarEl.style.width = `${Math.round(((session.currentIntervalSeconds - rem) / session.currentIntervalSeconds) * 100)}%`;
-        progressRemainingEl.textContent = displayTimerEl.textContent;
+        // progressRemainingEl.textContent = displayTimerEl.textContent;
         return;
     }
 
@@ -305,7 +316,7 @@ function tick() {
     const doneSec = session.currentIntervalSeconds - remainingSec;
     const pct = Math.max(0, Math.min(100, Math.round((doneSec / session.currentIntervalSeconds) * 100)));
     progressBarEl.style.width = pct + '%';
-    progressRemainingEl.textContent = displayTimerEl.textContent;
+    // progressRemainingEl.textContent = displayTimerEl.textContent;
     // update title
     document.title = `${displayTimerEl.textContent} · ${displayModeEl.textContent}`;
 
@@ -328,7 +339,7 @@ function updateUIFromSession() {
         sessionCompletedDisplayEl.textContent = '0';
         currentTramoIndexEl.textContent = '—';
         progressBarEl.style.width = '0%';
-        progressRemainingEl.textContent = secsToMMSS(FOCUS_SEC);
+        // progressRemainingEl.textContent = secsToMMSS(FOCUS_SEC);
         return;
     }
     sessionStateEl.textContent = 'En curso';
@@ -471,11 +482,19 @@ function cryptoRandomId() { return 'id-' + Math.random().toString(36).slice(2, 9
 
 // keyboard: space toggle pause if session running
 window.addEventListener('keydown', e => {
-    if (e.code === 'Space' && session) {
-        e.preventDefault();
-        togglePauseResume();
-    }
+  const tag = document.activeElement.tagName;
+
+  // 🚫 Si el usuario está escribiendo, no ejecutar atajos
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement.isContentEditable) {
+    return;
+  }
+
+  if (e.code === 'Space' && session) {
+    e.preventDefault();
+    togglePauseResume();
+  }
 });
+
 
 // initial document title
 document.title = 'Pomodoro · Listo';
