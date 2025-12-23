@@ -14,6 +14,8 @@ const SHORT_BREAK_SEC = 5 * 60; // 5 minutos
 const LONG_BREAK_SEC = 15 * 60; // 15 minutos
 const LONG_BREAK_EVERY = 4; // cada 4 tramos concentración -> descanso largo
 
+let totalTime = 0;
+
 // Sounds
 const intervalEndSound = new Audio("sounds/interval-end.wav");
 intervalEndSound.volume = 0.6;
@@ -39,6 +41,7 @@ const sessionStateEl = document.getElementById('session-state');
 const sessionTotalDurationEl = document.getElementById('session-total-duration');
 const sessionCompletedDisplayEl = document.getElementById('session-completed-display');
 const currentTramoIndexEl = document.getElementById('current-tramo-index');
+const sessionDayEl = document.getElementById('session-day');
 
 // Modal
 const summaryModal = new bootstrap.Modal(document.getElementById('summaryModal'));
@@ -56,6 +59,8 @@ const fullscreenBtn = document.getElementById('fullscreen-button');
 const fullscreenIcon = fullscreenBtn.querySelector('i');
 
 fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+sessionDayEl.textContent = "Sesión " + new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'numeric', year: '2-digit' });
 
 
 // BroadcastChannel to sync across tabs (optional, fallback to storage events)
@@ -165,7 +170,7 @@ function renderTasks() {
         <input type="checkbox" class="form-check-input mt-0 task-done" id="task-checkbox-${t.id}" data-id="${t.id}" ${t.done ? 'checked' : ''}>
         <div>
             <div class="fw-semibold"><label class="hover-pointer" for="task-checkbox-${t.id}">${escapeHtml(t.title)}</label></div>
-            <div class="tiny text-muted"><label class="hover-pointer" for="task-checkbox-${t.id}">Estimación:</label> <strong>${t.estimate}</strong> tramos</div>
+            <div class="tiny text-muted"><label class="hover-pointer" for="task-checkbox-${t.id}">Estimación:</label> <strong>${t.estimate > 1 ? t.estimate + ' tramos' : '1 tramo'}</strong></div>
         </div>
         </div>
         <div class="d-flex gap-2 align-items-center">
@@ -202,6 +207,7 @@ function renderTasks() {
             const t = tasks.find(x => x.id === id);
             t.estimate = val;
             saveTasks();
+            renderTasks();
             updateEstimates();
         });
     });
@@ -222,7 +228,9 @@ function updateEstimates() {
         }
     }
     totalDurationEl.textContent = formatMinutes(secs);
-    sessionTotalDurationEl.textContent = formatMinutesShort(secs);
+    // sessionTotalDurationEl.textContent = formatMinutesShort(secs);
+    updateUIFromSession();
+
 }
 
 // --- Session control ---
@@ -233,10 +241,6 @@ endBtn.addEventListener('click', endSession);
 function startSession() {
     // build session model from tasks: queue of focus tramos equal to sum of estimates
     const totalTramos = tasks.reduce((s, t) => s + (t.estimate || 0), 0);
-    if (totalTramos === 0) {
-        alert('Añade al menos un tramo estimado en las tareas para iniciar la sesión.');
-        return;
-    }
 
     // create a queue of "focus" tramos; we don't tie each focus to a specific task here, but you could.
     const now = Date.now();
@@ -286,16 +290,58 @@ function togglePauseResume() {
 
 function endSession() {
     if (!session) return;
-    // compute elapsed
-    const elapsedMs = Date.now() - session.startedAt;
-    openSummaryModal(elapsedMs, session.completedTramos, session);
-    // clear session
+
+    const now = Date.now();
+    const elapsedMs = now - session.startedAt;
+
+    let extraMinutes = 0;
+
+    // Si se termina durante un focus, calcular minutos parciales
+    if (session.mode === 'focus') {
+        const focusDurationMs = FOCUS_SEC * 1000;
+        const focusEndPlanned = session.endTimestamp;
+        const focusStart = focusEndPlanned - focusDurationMs;
+
+        const spentMs = Math.max(0, now - focusStart);
+        const spentMinutes = Math.floor(spentMs / 60000);
+
+        if (spentMinutes >= 5) {
+            extraMinutes = spentMinutes;
+        }
+    }
+
+    openSummaryModal(elapsedMs, session.completedTramos, session, extraMinutes);
+
+    // limpiar sesión
     session = null;
     localStorage.removeItem(KEY_SESSION);
+
+    // 🧹 limpiar tareas y resetear UI
+    resetAfterSession();
+
     broadcast();
     stopTick();
     updateUIFromSession();
 }
+
+function resetAfterSession() {
+    // borrar tareas
+    tasks.length = 0;
+    saveTasks();
+    renderTasks();
+
+    // reset visual del temporizador
+    document.getElementById('display-timer').textContent = '25:00';
+    document.getElementById('display-mode').textContent = 'Concentración';
+    document.getElementById('progress-bar').style.width = '0%';
+
+    document.getElementById('completed-count').textContent = '0';
+    document.getElementById('session-total-duration').textContent = '0m';
+    document.getElementById('current-tramo-index').textContent = '—';
+    document.getElementById('session-total-duration').textContent = '0m';
+}
+
+
 
 function completeCurrentInterval() {
     if (!session) return;
@@ -314,28 +360,15 @@ function completeCurrentInterval() {
     if (session.mode === 'focus') {
         session.completedTramos += 1;
         session.tramoIndex += 1;
-        // after a focus, decide break or end
-        if (session.completedTramos >= session.totalTramos) {
-            // session ends automatically
-            // show summary
-            const elapsedMs = Date.now() - session.startedAt;
-            openSummaryModal(elapsedMs, session.completedTramos, session);
-            session = null;
-            localStorage.removeItem(KEY_SESSION);
-            stopTick();
-            broadcast();
-            updateUIFromSession();
-            return;
+        // schedule break
+        if (session.completedTramos % LONG_BREAK_EVERY === 0) {
+            session.mode = 'longBreak';
+            session.currentIntervalSeconds = LONG_BREAK_SEC;
         } else {
-            // schedule break
-            if (session.completedTramos % LONG_BREAK_EVERY === 0) {
-                session.mode = 'longBreak';
-                session.currentIntervalSeconds = LONG_BREAK_SEC;
-            } else {
-                session.mode = 'shortBreak';
-                session.currentIntervalSeconds = SHORT_BREAK_SEC;
-            }
+            session.mode = 'shortBreak';
+            session.currentIntervalSeconds = SHORT_BREAK_SEC;
         }
+
     } else {
         // finished a break -> next focus
         session.mode = 'focus';
@@ -397,6 +430,8 @@ function tick() {
     // progressRemainingEl.textContent = displayTimerEl.textContent;
     // update title
     document.title = `${displayTimerEl.textContent} · ${displayModeEl.textContent}`;
+    let elapsedMs = Date.now() - session.startedAt;
+    sessionTotalDurationEl.textContent = msToFancyTime(elapsedMs);
 
     // if finished
     if (remainingSec <= 0) {
@@ -414,7 +449,7 @@ function updateUIFromSession() {
         endBtn.disabled = true;
         startBtn.disabled = false;
         completedCountEl.textContent = '0';
-        sessionCompletedDisplayEl.textContent = '0';
+        // sessionCompletedDisplayEl.textContent = '0';
         currentTramoIndexEl.textContent = '—';
         progressBarEl.style.width = '0%';
         // progressRemainingEl.textContent = secsToMMSS(FOCUS_SEC);
@@ -423,7 +458,7 @@ function updateUIFromSession() {
     sessionStateEl.textContent = 'En curso';
     sessionStateEl.className = 'meta-pill';
     completedCountEl.textContent = String(session.completedTramos || 0);
-    sessionCompletedDisplayEl.textContent = String(session.completedTramos || 0);
+    // sessionCompletedDisplayEl.textContent = String(session.completedTramos || 0);
     currentTramoIndexEl.textContent = `${Math.min(session.tramoIndex + 1, session.totalTramos)} / ${session.totalTramos}`;
     startBtn.disabled = true;
     endBtn.disabled = false;
@@ -510,21 +545,40 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // --- Summary modal & end flow ---
-function openSummaryModal(elapsedMs, completedPomos, sessionObj) {
+function openSummaryModal(elapsedMs, completedPomos, sessionObj, extraMinutes = 0) {
     document.getElementById('summary-duration').textContent = msToFancyTime(elapsedMs);
-    document.getElementById('summary-pomos').textContent = String(completedPomos);
+
+    // Texto de pomodoros + minutos extra
+    const pomosText =
+        extraMinutes >= 5
+            ? `${completedPomos} pomodoros + ${extraMinutes} min`
+            : `${completedPomos}`;
+
+    document.getElementById('summary-pomos').textContent = pomosText;
+
     const ul = document.getElementById('summary-tasks');
     ul.innerHTML = '';
-    // Show which tasks were completed at the moment (based on createdFromTasksSnapshot)
+
     const snapshot = sessionObj?.createdFromTasksSnapshot ?? tasks;
-    snapshot.forEach(t => {
+    const completedTasks = snapshot.filter(t => t.done);
+
+    if (completedTasks.length === 0) {
         const li = document.createElement('li');
-        li.className = 'list-group-item';
-        li.textContent = `${t.title} — estimados: ${t.estimate}${t.done ? ' — (marcada hecha)' : ''}`;
+        li.className = 'list-group-item text-muted';
+        li.textContent = 'No se completó ninguna tarea';
         ul.appendChild(li);
-    });
+    } else {
+        completedTasks.forEach(t => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.textContent = `${t.title} — estimados: ${t.estimate} tramos`;
+            ul.appendChild(li);
+        });
+    }
+
     summaryModal.show();
 }
+
 
 // --- Utilities ---
 function secsToMMSS(s) {
@@ -621,23 +675,23 @@ if (savedBg) {
 
 // Pantalla completa
 function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    // Animate fullscreen
-    document.documentElement.requestFullscreen();
-  } else {
-    document.exitFullscreen();
-  }
+    if (!document.fullscreenElement) {
+        // Animate fullscreen
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
 }
 
 // Actualizar icono según estado
 document.addEventListener('fullscreenchange', () => {
-  if (document.fullscreenElement) {
-    fullscreenIcon.classList.remove('bi-arrows-fullscreen');
-    fullscreenIcon.classList.add('bi-fullscreen-exit');
-    fullscreenBtn.title = 'Salir de pantalla completa';
-  } else {
-    fullscreenIcon.classList.remove('bi-fullscreen-exit');
-    fullscreenIcon.classList.add('bi-arrows-fullscreen');
-    fullscreenBtn.title = 'Pantalla completa';
-  }
+    if (document.fullscreenElement) {
+        fullscreenIcon.classList.remove('bi-arrows-fullscreen');
+        fullscreenIcon.classList.add('bi-fullscreen-exit');
+        fullscreenBtn.title = 'Salir de pantalla completa';
+    } else {
+        fullscreenIcon.classList.remove('bi-fullscreen-exit');
+        fullscreenIcon.classList.add('bi-arrows-fullscreen');
+        fullscreenBtn.title = 'Pantalla completa';
+    }
 });
