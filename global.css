@@ -393,3 +393,15 @@ body.has-custom-bg::before{
   pointer-events: none;
   z-index: -1;
 }
+
+.task-row {
+  cursor: grab;
+}
+
+.task-row.dragging {
+  opacity: 0.4;
+}
+
+.task-row:hover {
+  background: rgba(255,255,255,0.04);
+}

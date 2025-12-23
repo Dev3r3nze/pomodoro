@@ -48,6 +48,10 @@ let tasks = loadTasks();
 let session = loadSession(); // may be null or object
 let tickInterval = null;
 
+// Drag & Drop
+let draggedTask = null;
+
+
 // BroadcastChannel to sync across tabs (optional, fallback to storage events)
 let bc;
 try { bc = new BroadcastChannel('pomodoro_channel_v1'); bc.onmessage = onBroadcast; } catch (e) { bc = null; }
@@ -56,6 +60,72 @@ try { bc = new BroadcastChannel('pomodoro_channel_v1'); bc.onmessage = onBroadca
 renderTasks();
 updateEstimates();
 restoreUIFromSession();
+
+// --- Drag & Drop ---
+addEventListener("load", (event) => {
+    tasksListEl.addEventListener('dragstart', e => {
+        const task = e.target.closest('.task-row');
+        if (!task) return;
+
+        draggedTask = task;
+        task.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    tasksListEl.addEventListener('dragend', e => {
+        if (draggedTask) {
+            draggedTask.classList.remove('dragging');
+            draggedTask = null;
+            saveTasksOrder(); // 👈 importante
+        }
+    });
+
+    tasksListEl.addEventListener('dragover', e => {
+        e.preventDefault();
+
+        const afterElement = getDragAfterElement(tasksListEl, e.clientY);
+        if (!draggedTask) return;
+
+        if (afterElement == null) {
+            tasksListEl.appendChild(draggedTask);
+        } else {
+            tasksListEl.insertBefore(draggedTask, afterElement);
+        }
+    });
+    tasksListEl.addEventListener('dragstart', e => {
+        if (e.target.closest('input, button')) {
+            e.preventDefault();
+            return;
+        }
+    });
+});
+function getDragAfterElement(container, y) {
+    const elements = [...container.querySelectorAll('.task-row:not(.dragging)')];
+
+    return elements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+
+        if (offset < 0 && offset > closest.offset) {
+            return { offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+function saveTasksOrder() {
+    const orderedIds = [...document.querySelectorAll('.task-row')]
+        .map(el => el.dataset.id);
+
+    // aquí reordenas tu array de tareas interno
+    tasks.sort((a, b) => orderedIds.indexOf(a.id) - orderedIds.indexOf(b.id));
+
+    saveTasks(); // lo que ya uses para localStorage
+}
+
+
+
+
 
 // --- Task management ---
 document.getElementById('add-task-form').addEventListener('submit', e => {
@@ -78,11 +148,13 @@ function renderTasks() {
         return;
     }
     tasks.forEach(t => {
-    const li = document.createElement('div');
-    li.className = 'task-row list-group-item d-flex justify-content-between align-items-center';
-    if (t.done) li.classList.add('done');
+        const li = document.createElement('div');
+        li.className = 'task-row list-group-item d-flex justify-content-between align-items-center';
+        li.setAttribute('data-id', t.id);
+        li.setAttribute('draggable', 'true');
+        if (t.done) li.classList.add('done');
 
-    li.innerHTML = `
+        li.innerHTML = `
         <div class="d-flex w-75 align-items-center gap-3 user-select-none">
         <input type="checkbox" class="form-check-input mt-0 task-done" id="task-checkbox-${t.id}" data-id="${t.id}" ${t.done ? 'checked' : ''}>
         <div>
@@ -95,8 +167,8 @@ function renderTasks() {
         <button class="btn btn-link btn-sm text-danger task-delete" data-id="${t.id}" title="Eliminar"><i class="bi bi-trash"></i></button>
         </div>
     `;
-    tasksListEl.appendChild(li);
-});
+        tasksListEl.appendChild(li);
+    });
 
     // events
     tasksListEl.querySelectorAll('.task-done').forEach(chk => {
@@ -482,17 +554,17 @@ function cryptoRandomId() { return 'id-' + Math.random().toString(36).slice(2, 9
 
 // keyboard: space toggle pause if session running
 window.addEventListener('keydown', e => {
-  const tag = document.activeElement.tagName;
+    const tag = document.activeElement.tagName;
 
-  // 🚫 Si el usuario está escribiendo, no ejecutar atajos
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement.isContentEditable) {
-    return;
-  }
+    // 🚫 Si el usuario está escribiendo, no ejecutar atajos
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement.isContentEditable) {
+        return;
+    }
 
-  if (e.code === 'Space' && session) {
-    e.preventDefault();
-    togglePauseResume();
-  }
+    if (e.code === 'Space' && session) {
+        e.preventDefault();
+        togglePauseResume();
+    }
 });
 
 
@@ -509,34 +581,34 @@ const bgInput = document.getElementById("background-input");
 
 // Abrir selector de archivos
 bgButton.addEventListener("click", () => {
-  bgInput.click();
+    bgInput.click();
 });
 
 // Seleccionar imagen
 bgInput.addEventListener("change", (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
+    const file = event.target.files[0];
+    if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    const bgValue = `url(${reader.result})`;
-    applyBackground(bgValue);
-    localStorage.setItem("customBackground", bgValue);
-  };
-  reader.readAsDataURL(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+        const bgValue = `url(${reader.result})`;
+        applyBackground(bgValue);
+        localStorage.setItem("customBackground", bgValue);
+    };
+    reader.readAsDataURL(file);
 });
 
 // Aplicar fondo
-function applyBackground(bgValue){
-  document.body.style.backgroundImage = bgValue;
-  document.body.style.backgroundSize = "cover";
-  document.body.style.backgroundPosition = "center";
-  document.body.style.backgroundAttachment = "fixed";
-  document.body.classList.add("has-custom-bg");
+function applyBackground(bgValue) {
+    document.body.style.backgroundImage = bgValue;
+    document.body.style.backgroundSize = "cover";
+    document.body.style.backgroundPosition = "center";
+    document.body.style.backgroundAttachment = "fixed";
+    document.body.classList.add("has-custom-bg");
 }
 
 // Cargar fondo guardado
 const savedBg = localStorage.getItem("customBackground");
-if (savedBg){
-  applyBackground(savedBg);
+if (savedBg) {
+    applyBackground(savedBg);
 }
