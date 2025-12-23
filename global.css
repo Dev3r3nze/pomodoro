@@ -352,7 +352,7 @@ html, body {
 
 
 /* Floating background change button */
-#background-button{
+.floating-btn{
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -371,18 +371,23 @@ html, body {
   transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
 }
 
-#background-button:hover{
+.floating-btn:hover{
   transform: translateY(-2px) scale(1.03);
   box-shadow: 0 12px 36px rgba(0,0,0,0.7);
 }
 
-#background-button:active{
+.floating-btn:active{
   transform: scale(0.96);
 }
 
-#background-button i{
+.floating-btn i{
   font-size: 1.2rem;
 }
+
+.floating-btn.left {
+  left: 20px;
+}
+
 
 /* When a custom background is active, soften UI readability */
 body.has-custom-bg::before{

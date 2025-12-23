@@ -51,6 +51,12 @@ let tickInterval = null;
 // Drag & Drop
 let draggedTask = null;
 
+// Fullscreen
+const fullscreenBtn = document.getElementById('fullscreen-button');
+const fullscreenIcon = fullscreenBtn.querySelector('i');
+
+fullscreenBtn.addEventListener('click', toggleFullscreen);
+
 
 // BroadcastChannel to sync across tabs (optional, fallback to storage events)
 let bc;
@@ -612,3 +618,26 @@ const savedBg = localStorage.getItem("customBackground");
 if (savedBg) {
     applyBackground(savedBg);
 }
+
+// Pantalla completa
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    // Animate fullscreen
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+// Actualizar icono según estado
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement) {
+    fullscreenIcon.classList.remove('bi-arrows-fullscreen');
+    fullscreenIcon.classList.add('bi-fullscreen-exit');
+    fullscreenBtn.title = 'Salir de pantalla completa';
+  } else {
+    fullscreenIcon.classList.remove('bi-fullscreen-exit');
+    fullscreenIcon.classList.add('bi-arrows-fullscreen');
+    fullscreenBtn.title = 'Pantalla completa';
+  }
+});
