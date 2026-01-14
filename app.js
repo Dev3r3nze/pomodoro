@@ -9,9 +9,9 @@
    */
 
 // === Config (puedes exponer estos valores en UI si quieres) ===
-const FOCUS_SEC = 50 * 60;   // 50 minutos
-const SHORT_BREAK_SEC = 10 * 60; // 10 minutos
-const LONG_BREAK_SEC = 15 * 60; // 15 minutos
+const FOCUS_SEC = 25 * 60;   // 25 minutos
+const SHORT_BREAK_SEC = 5 * 60; // 5 minutos
+const LONG_BREAK_SEC = 10 * 60; // 10 minutos
 const LONG_BREAK_EVERY = 4; // cada 4 tramos concentración -> descanso largo
 
 let totalTime = 0;
